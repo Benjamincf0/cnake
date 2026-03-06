@@ -1,9 +1,6 @@
 #include "terminal_cntl.h"
 #include <fcntl.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <termios.h>
-#include <unistd.h>
 
 // SNAKE BUFFER
 #define MAX_SNAKE_LENGTH 16
@@ -88,30 +85,34 @@ void drawSnakeOnGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
 
 void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
                     int centerY) {
-  // TODO: move to (0,0)
-  int x0 = centerX - (GRID_WIDTH) / 2;
-  int x1 = centerY - (GRID_HEIGHT) / 2;
+  tc_clear_screen();
+  int x0 = centerX - (GRID_WIDTH);
+  int y0 = centerY - (GRID_HEIGHT) / 2;
+  tc_move_cursor(x0, y0);
 
   for (int i = GRID_HEIGHT - 1; i >= 0; i--) {
+    tc_move_cursor(x0, y0+i);
     for (int j = 0; j < GRID_WIDTH; j++) {
       if (grid[j][i] == SNAKE) {
-        printf("%s %s", TC_BG_RED, TC_BG_NRM);
+        printf("%s  %s", TC_BG_RED, TC_BG_NRM);
       } else if (grid[j][i] == FRUIT) {
-        printf("%s %s", TC_BG_WHT, TC_BG_NRM);
+        printf("%s  %s", TC_BG_RED, TC_BG_NRM);
       } else if (grid[j][i] == EMPTY) {
-        printf("%s %s", TC_BG_NRM, TC_BG_NRM);
+        printf("%s  %s", TC_BG_WHT, TC_BG_NRM);
       } else {
-        printf("%s %s", TC_BG_RED, TC_BG_NRM);
+        printf("%s  %s", TC_BG_RED, TC_BG_NRM);
       }
+      // usleep(1000);
     }
-    printf("\n");
   }
+  fflush(stdout);
 }
 // GAME GRID END
 
 int main(int argc, char *argv[]) {
   fprintf(stdout, "Hello Woorld\n");
-
+  int screenWidth, screenHeight;
+  tc_get_cols_rows(&screenWidth, &screenHeight);
   enum cellType gameGrid[GRID_WIDTH][GRID_HEIGHT] = {0};
   gameGrid[14][6] = FRUIT;
 
@@ -133,9 +134,11 @@ int main(int argc, char *argv[]) {
   snakeAdvance(&gameSnake, 6, 8);
   snakePrintDebug(&gameSnake);
 
+  tc_echo_off();
   tc_enter_alt_screen();
-
-  for (int i = 0; i < 1000; i++) {
+  tc_hide_cursor();
+  //fflush();
+  for (int i = 0; i < 120; i++) {
     // TODO:
     // check for last char input
     // char letta = getc(stdin);
@@ -151,10 +154,13 @@ int main(int argc, char *argv[]) {
     // (find a way to hide cursor)
 
     drawSnakeOnGrid(gameGrid, &gameSnake);
-    renderGameGrid(gameGrid);
-    usleep(1000);
+    renderGameGrid(gameGrid, screenWidth/2, screenHeight/2);
+    usleep(10000);
   }
   tc_exit_alt_screen();
+  tc_echo_on();
+  tc_show_cursor();
+  //fflush();
   return 0;
 }
 
