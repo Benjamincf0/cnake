@@ -100,7 +100,7 @@ void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
       } else if (grid[j][i] == EMPTY) {
         printf("%s  %s", TC_BG_WHT, TC_BG_NRM);
       } else {
-        printf("%s  %s", TC_BG_RED, TC_BG_NRM);
+        printf("%s%c %s", TC_BG_RED, (char)grid[i][j], TC_BG_NRM);
       }
       // usleep(1000);
     }
@@ -134,11 +134,13 @@ int main(int argc, char *argv[]) {
   snakeAdvance(&gameSnake, 6, 8);
   snakePrintDebug(&gameSnake);
 
-  tc_echo_off();
-  tc_enter_alt_screen();
-  tc_hide_cursor();
+  tc_echo_off(); // Don't echo sdin -> stdout
+  tc_enter_alt_screen(); // Change to another buffer
+  tc_hide_cursor(); // Don't blink cursor
+  tc_raw_mode(); // Don't wait for new line.
+  tc_getc_nonblock();
   //fflush();
-  for (int i = 0; i < 120; i++) {
+  for (int i = 0; i < 240; i++) {
     // TODO:
     // check for last char input
     // char letta = getc(stdin);
@@ -152,6 +154,12 @@ int main(int argc, char *argv[]) {
     // get window dimensions {windowWidth}, {windowHeight}
     // renderGameGrid(enum cellType grid[][], centerX, centerY);
     // (find a way to hide cursor)
+    // int result = getc(stdin);
+    // if (result == EOF) {
+    //   continue;
+    // }
+    char letta = 'J';
+    gameGrid[0][0] = letta;
 
     drawSnakeOnGrid(gameGrid, &gameSnake);
     renderGameGrid(gameGrid, screenWidth/2, screenHeight/2);
@@ -160,9 +168,12 @@ int main(int argc, char *argv[]) {
   tc_exit_alt_screen();
   tc_echo_on();
   tc_show_cursor();
+  tc_canonical_mode();
+  tc_getc_block();
   //fflush();
   return 0;
 }
+// TODO: Set an atexit()
 
 // REQUIREMENTS
 // snake game

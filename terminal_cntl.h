@@ -51,4 +51,26 @@ void tc_echo_on(){
 	tcsetattr(1, TCSANOW, &term);
 }
 
+void tc_getc_nonblock();
+
+void tc_getc_nonblock() {
+	struct termios newSettings;
+	tcgetattr(1, &newSettings);
+	term.c_lflag &= ~ECHO;
+	tcsetattr(1, TCSANOW, &term);
+}
+
+void tc_getc_block();
+
+void tc_canonical_mode();
+
+void tc_canonical_off();
+
+void tc_canonical_off() { // a.k.a. raw ;)
+	struct termios newSettings;
+	tcgetattr(1, &newSettings);
+	term.c_lflag &= ~ECHO;
+	tcsetattr(1, TCSANOW, &term);
+}
+
 #endif
