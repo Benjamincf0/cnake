@@ -1,6 +1,7 @@
 #include "terminal_cntl.h"
 #include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 
 // SNAKE BUFFER
 #define MAX_SNAKE_LENGTH 16
@@ -83,12 +84,22 @@ void drawSnakeOnGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
   }
 }
 
+void clearSnakeOnGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
+                      struct snakeCircularBuffer *snakeRef) {
+  for (int i = 0; i < snakeRef->_length; i++) {
+    // draw cell
+    int *coords = snakeGetCoordinates(snakeRef, i);
+    grid[coords[0]][coords[1]] = EMPTY;
+  }
+}
+
 void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
                     int centerY) {
   tc_clear_screen();
   int x0 = centerX - (GRID_WIDTH);
   int y0 = centerY - (GRID_HEIGHT) / 2;
-  tc_move_cursor(x0, y0);
+  tc_move_cursor(x0, y0 - 1);
+  printf("Welcome to CNAKE - Ben");
 
   for (int i = GRID_HEIGHT - 1; i >= 0; i--) {
     tc_move_cursor(x0, y0 + i);
@@ -96,7 +107,7 @@ void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
       if (grid[j][i] == SNAKE) {
         printf("%s  %s", TC_BG_RED, TC_BG_NRM);
       } else if (grid[j][i] == FRUIT) {
-        printf("%s  %s", TC_BG_RED, TC_BG_NRM);
+        printf("%s  %s", TC_BG_GRN, TC_BG_NRM);
       } else if (grid[j][i] == EMPTY) {
         printf("%s  %s", TC_BG_WHT, TC_BG_NRM);
       } else {
@@ -107,7 +118,63 @@ void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
   }
   fflush(stdout);
 }
+
+void gameOver(int error, struct snakeCircularBuffer *snakeRef) {
+  tc_echo_on();
+  tc_exit_alt_screen();
+  tc_show_cursor();
+  tc_canonical_on(); // Don't wait for new line.
+  tc_getc_block_on();
+
+  free((*snakeRef)._buffer);
+
+  printf("GAME OVER LOL BOZO %d\n", error);
+
+  exit(error);
+}
+
+enum Direction { UP, DOWN, LEFT, RIGHT, NONE };
+void snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
+                 struct snakeCircularBuffer *snakeRef, enum Direction dir) {
+  int *headCoords = snakeGetCoordinates(snakeRef, snakeRef->_length - 1);
+  int currHeadX = headCoords[0];
+  int currHeadY = headCoords[1];
+
+  if (dir == UP) {
+    currHeadY--;
+  } else if (dir == DOWN) {
+    currHeadY++;
+  } else if (dir == LEFT) {
+    currHeadX--;
+  } else if (dir == RIGHT) {
+    currHeadX++;
+  }
+
+  // collisions
+  if (currHeadX >= GRID_WIDTH || currHeadY >= GRID_HEIGHT || currHeadX < 0 ||
+      currHeadY < 0) {
+    gameOver(1, snakeRef);
+  }
+
+  for (int i = 1; i < snakeRef->_length - 2; i++) {
+    // skip head and tail cuz they can be the same;
+    int *coords = snakeGetCoordinates(snakeRef, i);
+    if (currHeadX == coords[0] && currHeadY == coords[1]) {
+      gameOver(2, snakeRef); // self collision;
+    }
+  }
+
+  // check if we got a fruit
+  if (grid[currHeadX][currHeadY] == FRUIT) {
+    // we landed on fruit;
+    snakeGrow(snakeRef, currHeadX, currHeadY);
+  } else {
+    snakeAdvance(snakeRef, currHeadX, currHeadY);
+  }
+}
 // GAME GRID END
+
+void cleanup_buf(void) { gameOver(4, NULL); }
 
 int main(int argc, char *argv[]) {
   fprintf(stdout, "Hello Woorld\n");
@@ -115,6 +182,21 @@ int main(int argc, char *argv[]) {
   tc_get_cols_rows(&screenWidth, &screenHeight);
   enum cellType gameGrid[GRID_WIDTH][GRID_HEIGHT] = {0};
   gameGrid[14][6] = FRUIT;
+  gameGrid[16][12] = FRUIT;
+  gameGrid[14][19] = FRUIT;
+  gameGrid[19][18] = FRUIT;
+  gameGrid[14][16] = FRUIT;
+  gameGrid[14][6] = FRUIT;
+  gameGrid[1][6] = FRUIT;
+  gameGrid[4][5] = FRUIT;
+  gameGrid[3][8] = FRUIT;
+  gameGrid[8][18] = FRUIT;
+  gameGrid[9][2] = FRUIT;
+  gameGrid[10][3] = FRUIT;
+  gameGrid[1][12] = FRUIT;
+  gameGrid[14][18] = FRUIT;
+  gameGrid[7][4] = FRUIT;
+  gameGrid[4][9] = FRUIT;
 
   printf("step 2\n");
 
@@ -126,13 +208,7 @@ int main(int argc, char *argv[]) {
   snakePrintDebug(&gameSnake);
   snakePrintDebug(&gameSnake);
 
-  snakeGrow(&gameSnake, 5, 6);
-  snakePrintDebug(&gameSnake);
-  snakeGrow(&gameSnake, 5, 7);
-  snakeGrow(&gameSnake, 6, 7);
-  snakePrintDebug(&gameSnake);
-  snakeAdvance(&gameSnake, 6, 8);
-  snakePrintDebug(&gameSnake);
+  enum Direction d = DOWN;
 
   tc_echo_off();         // Don't echo sdin -> stdout
   tc_enter_alt_screen(); // Change to another buffer
@@ -140,7 +216,7 @@ int main(int argc, char *argv[]) {
   tc_canonical_off();    // Don't wait for new line.
   tc_getc_block_off();
 
-  for (int i = 0; i < 240; i++) {
+  for (int i = 0; i < 1000; i++) {
     // TODO:
     // check for last char input
     // char letta = getc(stdin);
@@ -155,24 +231,45 @@ int main(int argc, char *argv[]) {
     // renderGameGrid(enum cellType grid[][], centerX, centerY);
     // (find a way to hide cursor)
     clearerr(stdin); // clears the EOF flag so that getc doesnt give up
-    int result = getc(stdin);
-    if (result != EOF) {
-      gameGrid[0][0] = result;
+    int result = EOF;
+    int temp;
+
+    // Keep reading until the buffer is empty
+    // This "fast-forwards" to the most recent keypress
+    while ((temp = getc(stdin)) != EOF) {
+      result = temp;
+      gameGrid[0][0] = (char)result;
     }
 
+    enum Direction d;
+    switch (result) {
+    case 'j':
+      d = DOWN;
+      break;
+    case 'k':
+      d = UP;
+      break;
+    case 'h':
+      d = LEFT;
+      break;
+    case 'l':
+      d = RIGHT;
+      break;
+    }
+
+    clearSnakeOnGrid(gameGrid, &gameSnake);
+    snakeUpdate(gameGrid, &gameSnake, d);
     drawSnakeOnGrid(gameGrid, &gameSnake);
     renderGameGrid(gameGrid, screenWidth / 2, screenHeight / 2);
     fflush(stdout);
-    usleep(10000);
+    usleep(200000);
   }
-  tc_echo_on();
-  tc_exit_alt_screen();
-  tc_show_cursor();
-  tc_canonical_on(); // Don't wait for new line.
-  tc_getc_block_on();
+  gameOver(0, &gameSnake);
 
+  atexit(cleanup_buf);
   return 0;
 }
+
 // TODO: Set an atexit()
 
 // REQUIREMENTS

@@ -12,6 +12,7 @@
 
 #define TC_BG_NRM "\x1B[40m"
 #define TC_BG_RED "\x1B[41m"
+#define TC_BG_GRN "\x1B[42m"
 #define TC_BG_WHT "\x1B[47m"
 
 // #define tc_clear_screen() puts("\x1B[2J")
