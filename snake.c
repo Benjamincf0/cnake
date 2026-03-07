@@ -156,7 +156,7 @@ void snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
     gameOver(1, snakeRef);
   }
 
-  for (int i = 1; i < snakeRef->_length - 2; i++) {
+  for (int i = 1; i < snakeRef->_length - 1; i++) {
     // skip head and tail cuz they can be the same;
     int *coords = snakeGetCoordinates(snakeRef, i);
     if (currHeadX == coords[0] && currHeadY == coords[1]) {
@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
     drawSnakeOnGrid(gameGrid, &gameSnake);
     renderGameGrid(gameGrid, screenWidth / 2, screenHeight / 2);
     fflush(stdout);
-    usleep(200000);
+    usleep(100000);
   }
   gameOver(0, &gameSnake);
 
