@@ -91,7 +91,7 @@ void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
   tc_move_cursor(x0, y0);
 
   for (int i = GRID_HEIGHT - 1; i >= 0; i--) {
-    tc_move_cursor(x0, y0+i);
+    tc_move_cursor(x0, y0 + i);
     for (int j = 0; j < GRID_WIDTH; j++) {
       if (grid[j][i] == SNAKE) {
         printf("%s  %s", TC_BG_RED, TC_BG_NRM);
@@ -134,12 +134,12 @@ int main(int argc, char *argv[]) {
   snakeAdvance(&gameSnake, 6, 8);
   snakePrintDebug(&gameSnake);
 
-  tc_echo_off(); // Don't echo sdin -> stdout
+  tc_echo_off();         // Don't echo sdin -> stdout
   tc_enter_alt_screen(); // Change to another buffer
-  tc_hide_cursor(); // Don't blink cursor
-  tc_raw_mode(); // Don't wait for new line.
-  tc_getc_nonblock();
-  //fflush();
+  tc_hide_cursor();      // Don't blink cursor
+  tc_canonical_off();    // Don't wait for new line.
+  tc_getc_block_off();
+
   for (int i = 0; i < 240; i++) {
     // TODO:
     // check for last char input
@@ -154,23 +154,23 @@ int main(int argc, char *argv[]) {
     // get window dimensions {windowWidth}, {windowHeight}
     // renderGameGrid(enum cellType grid[][], centerX, centerY);
     // (find a way to hide cursor)
-    // int result = getc(stdin);
-    // if (result == EOF) {
-    //   continue;
-    // }
-    char letta = 'J';
-    gameGrid[0][0] = letta;
+    clearerr(stdin); // clears the EOF flag so that getc doesnt give up
+    int result = getc(stdin);
+    if (result != EOF) {
+      gameGrid[0][0] = result;
+    }
 
     drawSnakeOnGrid(gameGrid, &gameSnake);
-    renderGameGrid(gameGrid, screenWidth/2, screenHeight/2);
+    renderGameGrid(gameGrid, screenWidth / 2, screenHeight / 2);
+    fflush(stdout);
     usleep(10000);
   }
-  tc_exit_alt_screen();
   tc_echo_on();
+  tc_exit_alt_screen();
   tc_show_cursor();
-  tc_canonical_mode();
-  tc_getc_block();
-  //fflush();
+  tc_canonical_on(); // Don't wait for new line.
+  tc_getc_block_on();
+
   return 0;
 }
 // TODO: Set an atexit()
