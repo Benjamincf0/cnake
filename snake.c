@@ -1,10 +1,12 @@
 #include "terminal_cntl.h"
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // SNAKE BUFFER
-#define MAX_SNAKE_LENGTH 16
+const int MAX_SNAKE_LENGTH = 400;
 const int COLS = 2;
 
 struct snakeCircularBuffer {
@@ -75,24 +77,6 @@ void snakePrintDebug(struct snakeCircularBuffer *snakeRef) {
 
 enum cellType { EMPTY, SNAKE, FRUIT };
 
-void drawSnakeOnGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
-                     struct snakeCircularBuffer *snakeRef) {
-  for (int i = 0; i < snakeRef->_length; i++) {
-    // draw cell
-    int *coords = snakeGetCoordinates(snakeRef, i);
-    grid[coords[0]][coords[1]] = SNAKE;
-  }
-}
-
-void clearSnakeOnGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
-                      struct snakeCircularBuffer *snakeRef) {
-  for (int i = 0; i < snakeRef->_length; i++) {
-    // draw cell
-    int *coords = snakeGetCoordinates(snakeRef, i);
-    grid[coords[0]][coords[1]] = EMPTY;
-  }
-}
-
 void renderGameGrid(enum cellType grid[GRID_WIDTH][GRID_HEIGHT], int centerX,
                     int centerY) {
   tc_clear_screen();
@@ -126,7 +110,9 @@ void gameOver(int error, struct snakeCircularBuffer *snakeRef) {
   tc_canonical_on(); // Don't wait for new line.
   tc_getc_block_on();
 
-  free((*snakeRef)._buffer);
+  if (snakeRef != NULL) {
+    free((*snakeRef)._buffer);
+  }
 
   printf("GAME OVER LOL BOZO %d\n", error);
 
@@ -134,8 +120,8 @@ void gameOver(int error, struct snakeCircularBuffer *snakeRef) {
 }
 
 enum Direction { UP, DOWN, LEFT, RIGHT, NONE };
-void snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
-                 struct snakeCircularBuffer *snakeRef, enum Direction dir) {
+int snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
+                struct snakeCircularBuffer *snakeRef, enum Direction dir) {
   int *headCoords = snakeGetCoordinates(snakeRef, snakeRef->_length - 1);
   int currHeadX = headCoords[0];
   int currHeadY = headCoords[1];
@@ -153,14 +139,18 @@ void snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
   // collisions
   if (currHeadX >= GRID_WIDTH || currHeadY >= GRID_HEIGHT || currHeadX < 0 ||
       currHeadY < 0) {
-    gameOver(1, snakeRef);
+    exit(1);
   }
 
-  for (int i = 1; i < snakeRef->_length - 1; i++) {
-    // skip head and tail cuz they can be the same;
-    int *coords = snakeGetCoordinates(snakeRef, i);
-    if (currHeadX == coords[0] && currHeadY == coords[1]) {
-      gameOver(2, snakeRef); // self collision;
+  if (grid[currHeadX][currHeadY] == SNAKE) {
+    int *beforeHeadCoords =
+        snakeGetCoordinates(snakeRef, snakeRef->_length - 2);
+    if ((beforeHeadCoords[0] == currHeadX &&
+         beforeHeadCoords[1] == currHeadY)) {
+      currHeadX = 2 * headCoords[0] - beforeHeadCoords[0];
+      currHeadY = 2 * headCoords[1] - beforeHeadCoords[1];
+    } else {
+      exit(1);
     }
   }
 
@@ -168,47 +158,45 @@ void snakeUpdate(enum cellType grid[GRID_WIDTH][GRID_HEIGHT],
   if (grid[currHeadX][currHeadY] == FRUIT) {
     // we landed on fruit;
     snakeGrow(snakeRef, currHeadX, currHeadY);
+    int *head = snakeGetCoordinates(snakeRef, snakeRef->_length - 1);
+    grid[head[0]][head[1]] = SNAKE;
+    return 1;
   } else {
+    int *oldTail = snakeGetCoordinates(snakeRef, 0);
+    grid[oldTail[0]][oldTail[1]] = EMPTY; // Clear old spot
     snakeAdvance(snakeRef, currHeadX, currHeadY);
+    int *head = snakeGetCoordinates(snakeRef, snakeRef->_length - 1);
+    grid[head[0]][head[1]] = SNAKE;
+    return 0;
   }
 }
-// GAME GRID END
+
+void generateFruit(enum cellType grid[GRID_WIDTH][GRID_HEIGHT]) {
+  int random_w = 4;
+  int random_h = 4;
+  do {
+    random_w = rand() % GRID_HEIGHT;
+    random_h = rand() % GRID_HEIGHT;
+  } while (grid[random_w][random_h] != EMPTY);
+  grid[random_w][random_h] = FRUIT;
+}
 
 void cleanup_buf(void) { gameOver(4, NULL); }
 
 int main(int argc, char *argv[]) {
-  fprintf(stdout, "Hello Woorld\n");
+  atexit(cleanup_buf);
+  signal(SIGINT, exit);
+  srand(time(NULL));
   int screenWidth, screenHeight;
   tc_get_cols_rows(&screenWidth, &screenHeight);
   enum cellType gameGrid[GRID_WIDTH][GRID_HEIGHT] = {0};
-  gameGrid[14][6] = FRUIT;
-  gameGrid[16][12] = FRUIT;
-  gameGrid[14][19] = FRUIT;
-  gameGrid[19][18] = FRUIT;
-  gameGrid[14][16] = FRUIT;
-  gameGrid[14][6] = FRUIT;
-  gameGrid[1][6] = FRUIT;
-  gameGrid[4][5] = FRUIT;
-  gameGrid[3][8] = FRUIT;
-  gameGrid[8][18] = FRUIT;
-  gameGrid[9][2] = FRUIT;
-  gameGrid[10][3] = FRUIT;
-  gameGrid[1][12] = FRUIT;
-  gameGrid[14][18] = FRUIT;
-  gameGrid[7][4] = FRUIT;
-  gameGrid[4][9] = FRUIT;
 
   printf("step 2\n");
 
   struct snakeCircularBuffer gameSnake;
   initSnake(&gameSnake, 5, 5);
-  printf("snake length: %d\n", gameSnake._length);
-  fprintf(stdout, "Head: %d\nTail: %d\n", gameSnake._tail, gameSnake._head);
-
-  snakePrintDebug(&gameSnake);
-  snakePrintDebug(&gameSnake);
-
-  enum Direction d = DOWN;
+  gameGrid[12][12] = FRUIT;
+  enum Direction d = NONE;
 
   tc_echo_off();         // Don't echo sdin -> stdout
   tc_enter_alt_screen(); // Change to another buffer
@@ -238,35 +226,41 @@ int main(int argc, char *argv[]) {
     // This "fast-forwards" to the most recent keypress
     while ((temp = getc(stdin)) != EOF) {
       result = temp;
-      gameGrid[0][0] = (char)result;
+      // gameGrid[0][0] = (char)result;
     }
 
-    enum Direction d;
     switch (result) {
     case 'j':
-      d = DOWN;
+      if (d != UP)
+        d = DOWN;
       break;
     case 'k':
-      d = UP;
+      if (d != DOWN)
+        d = UP;
       break;
     case 'h':
-      d = LEFT;
+      if (d != RIGHT)
+        d = LEFT;
       break;
     case 'l':
-      d = RIGHT;
+      if (d != LEFT)
+        d = RIGHT;
+      break;
+    case 'q':
+      gameOver(0, &gameSnake);
       break;
     }
 
-    clearSnakeOnGrid(gameGrid, &gameSnake);
-    snakeUpdate(gameGrid, &gameSnake, d);
-    drawSnakeOnGrid(gameGrid, &gameSnake);
+    int didSnakeGrow = snakeUpdate(gameGrid, &gameSnake, d);
     renderGameGrid(gameGrid, screenWidth / 2, screenHeight / 2);
+    if (didSnakeGrow) {
+      generateFruit(gameGrid);
+    };
     fflush(stdout);
     usleep(100000);
   }
   gameOver(0, &gameSnake);
 
-  atexit(cleanup_buf);
   return 0;
 }
 
